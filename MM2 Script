@@ -48,7 +48,7 @@ if authStatus == "Blacklist" then
 end
 
 -- ==========================================
--- UNC & SERVICES
+-- UNC & BULLETPROOF SERVICES 🛡️
 -- ==========================================
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -57,16 +57,24 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local Mouse = LocalPlayer:GetMouse()
 
-local get_gc = getgc or get_gc; local get_fenv = getfenv or get_fenv; local get_constants = debug.getconstants or getconstants; local set_constant = debug.setconstant or setconstant
+-- Safe Executor Function Checks (Prevents Nil Calls)
+local get_gc = type(getgc) == "function" and getgc or (type(get_gc) == "function" and get_gc) or nil
+local get_fenv = type(getfenv) == "function" and getfenv or (type(get_fenv) == "function" and get_fenv) or nil
+local get_constants = (type(debug) == "table" and type(debug.getconstants) == "function" and debug.getconstants) or (type(getconstants) == "function" and getconstants) or nil
+local set_constant = (type(debug) == "table" and type(debug.setconstant) == "function" and debug.setconstant) or (type(setconstant) == "function" and setconstant) or nil
 
-local env = getgenv and getgenv() or _G
-if env.MM2Running then env.MM2Running = false task.wait(0.1) end 
+local _readfile = type(readfile) == "function" and readfile or (type(read_file) == "function" and read_file) or nil
+local _writefile = type(writefile) == "function" and writefile or (type(write_file) == "function" and write_file) or nil
+local _isfile = type(isfile) == "function" and isfile or (type(is_file) == "function" and is_file) or nil
+
+local env = (type(getgenv) == "function" and getgenv()) or _G
+if env.MM2Running then env.MM2Running = false; task.wait(0.1) end 
 env.MM2Running = true 
 
 if env.MM2Connections then
-    for _, conn in ipairs(env.MM2Connections) do if conn.Connected then conn:Disconnect() end end
-    if env.MM2Gui then env.MM2Gui:Destroy() end
-    if env.MM2Folder then env.MM2Folder:Destroy() end
+    for _, conn in ipairs(env.MM2Connections) do if type(conn) == "table" and conn.Connected then pcall(function() conn:Disconnect() end) end end
+    if env.MM2Gui then pcall(function() env.MM2Gui:Destroy() end) end
+    if env.MM2Folder then pcall(function() env.MM2Folder:Destroy() end) end
 end
 
 env.MM2Connections = {}
@@ -76,15 +84,20 @@ local espStorage = Instance.new("Folder"); espStorage.Name = "MM2_ESP_Storage"; 
 
 local keybindsFile = "MM2_GodEye_Keybinds.json"
 local binds = { ESP="", CoinESP="", AntiFling="", AutoShoot="", Hitbox="", Bring="", BringClosest="", BringAll="", BringSheriff="", Panic="", Speed="", GrabGun="", AutoGrabGun="", AutoCoin="", AutoCoinSafe="", AutoCopyKnife="", LoopTrip="", Invis="", GodMode="", Orbit="" }
-if isfile and isfile(keybindsFile) then
-    local success, decoded = pcall(function() return HttpService:JSONDecode(readfile(keybindsFile)) end)
+
+-- Bulletproof File System Read
+if _isfile and _isfile(keybindsFile) and _readfile then
+    local success, decoded = pcall(function() return HttpService:JSONDecode(_readfile(keybindsFile)) end)
     if success and type(decoded) == "table" then for k, v in pairs(decoded) do binds[k] = v end end
 end
-local function saveBinds() if writefile then pcall(function() writefile(keybindsFile, HttpService:JSONEncode(binds)) end) end end
+
+local function saveBinds() 
+    if _writefile then pcall(function() _writefile(keybindsFile, HttpService:JSONEncode(binds)) end) end 
+end
 
 local isESPOn = false
 local espRoundState = "IDLE" 
-local hasGunDroppedThisRound = false
+local hasGunDroppedThisRound = false 
 
 -- 🤑 ASYNC ZERO-LAG CLEANUP
 local function clearAllPlayerESP() 
@@ -131,9 +144,9 @@ local function getRoleColor(player)
         return Color3.fromRGB(255, 0, 0) 
     elseif isPlayerSheriff(player) then 
         if hasGunDroppedThisRound then
-            return Color3.fromRGB(255, 255, 0)
+            return Color3.fromRGB(255, 255, 0) 
         else
-            return Color3.fromRGB(0, 85, 255)
+            return Color3.fromRGB(0, 85, 255) 
         end
     else 
         return Color3.fromRGB(0, 255, 0) 
@@ -186,7 +199,7 @@ local function executeFullESPScan()
     
     task.spawn(function()
         for _, child in ipairs(espStorage:GetChildren()) do
-            if child.Name ~= "GunDrop_ESP" and (child.Name:sub(-4) == "_ESP" or child.Name:sub(-9) == "_ESP_Text") and not validESP[child.Name] then
+            if child.Name ~= "GunDrop_ESP" and (child.Name:sub(-4) == "_ESP" and not validESP[child.Name]) or (child.Name:sub(-9) == "_ESP_Text" and not validESP[child.Name]) then
                 child.Parent = nil
                 task.defer(function() pcall(function() child:Destroy() end) end)
             end
@@ -198,7 +211,7 @@ end
 -- XBOX SPOOFER & CHAD REMOTE INTERCEPTOR 🎮📡
 -- ==========================================
 pcall(function()
-    if hookmetamethod then
+    if type(hookmetamethod) == "function" then
         local oldNamecall; oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             local method = getnamecallmethod()
             if self == UserInputService and method == "GetPlatform" then return Enum.Platform.XBoxOne end
@@ -400,11 +413,17 @@ local function hookMemoryNoclipCam(state)
     pcall(function()
         if not LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule") then return end
         local pop = LocalPlayer.PlayerScripts.PlayerModule.CameraModule.ZoomController.Popper
-        for _, v in pairs(get_gc()) do
-            if type(v) == 'function' and get_fenv(v).script == pop then
-                local consts = get_constants(v)
-                for i, v1 in pairs(consts) do
-                    if state and tonumber(v1) == 0.25 then set_constant(v, i, 0) elseif not state and tonumber(v1) == 0 then set_constant(v, i, 0.25) end
+        if _get_gc then
+            for _, v in pairs(_get_gc()) do
+                if type(v) == 'function' and _get_fenv and _get_fenv(v).script == pop then
+                    if get_constants then
+                        local consts = get_constants(v)
+                        for i, v1 in pairs(consts) do
+                            if set_constant then
+                                if state and tonumber(v1) == 0.25 then set_constant(v, i, 0) elseif not state and tonumber(v1) == 0 then set_constant(v, i, 0.25) end
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -553,7 +572,7 @@ local function executeToolInvis()
     boxTouched = box.Touched:Connect(function(part)
         if part:IsDescendantOf(myChar) and not touched then
             touched = true; local clone = hrp:Clone(); task.wait(0.25)
-            if myChar and myChar:FindFirstChild("HumanoidRootPart") then myChar.HumanoidRootPart:Destroy(); clone.Parent = myChar; myChar:MoveTo(originalLoc) end
+            if myChar and myChar:FindFirstChild("HumanoidRootPart") then pcall(function() myChar.HumanoidRootPart:Destroy() end); clone.Parent = myChar; myChar:MoveTo(originalLoc) end
         end
     end)
     local cleanUp; cleanUp = LocalPlayer.CharacterAdded:Connect(function(char) if boxTouched then boxTouched:Disconnect() end; if box then box:Destroy() end; if cleanUp then cleanUp:Disconnect() end; InvisibleBtn.Text = "Become Invisible" end)
@@ -566,7 +585,7 @@ local function executeGodMode()
     local Pos = Cam.CFrame; local Human = Char:FindFirstChildWhichIsA("Humanoid"); if not Human then return end
     GodModeBtn.Text = "Activating God Mode..."; local nHuman = Human:Clone(); nHuman.Parent = Char; LocalPlayer.Character = nil
     nHuman:SetStateEnabled(Enum.HumanoidStateType.Dead, false); nHuman:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); nHuman:SetStateEnabled(Enum.HumanoidStateType.Physics, false); nHuman.BreakJointsOnDeath = true
-    Human:Destroy(); LocalPlayer.Character = Char; Cam.CameraSubject = nHuman; task.wait(); Cam.CFrame = Pos; nHuman.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    pcall(function() Human:Destroy() end); LocalPlayer.Character = Char; Cam.CameraSubject = nHuman; task.wait(); Cam.CFrame = Pos; nHuman.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     local animateScript = Char:FindFirstChild("Animate"); if animateScript then animateScript.Disabled = true; task.wait(); animateScript.Disabled = false end
     nHuman.Health = nHuman.MaxHealth; task.wait(1); GodModeBtn.Text = "God Mode"
 end
@@ -603,7 +622,7 @@ local function toggleFeature(feature)
         if not isESPOn then 
             clearAllPlayerESP()
             espRoundState = "IDLE"
-            hasGunDroppedThisRound = false
+            hasGunDroppedThisRound = false 
         else
             local hasKnife = false
             for _, p in ipairs(Players:GetPlayers()) do
@@ -887,40 +906,7 @@ saveConn(RunService.RenderStepped:Connect(function()
     if isESPOn then
         local hasKnife = false
         for _, p in ipairs(Players:GetPlayers()) do
-            if isPlayerMurderer(p) then hasKnife = true end
-            
-            -- 💀 CHAD LOGIC: Real-time dynamic Adornee snapping (Zero-lag Property Checking)
-            if p ~= LocalPlayer and p.Character then
-                local highlight = espStorage:FindFirstChild(p.Name .. "_ESP")
-                local textGui = espStorage:FindFirstChild(p.Name .. "_ESP_Text")
-                
-                if highlight and textGui then
-                    local hum = p.Character:FindFirstChild("Humanoid")
-                    local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-                    local head = p.Character:FindFirstChild("Head")
-                    
-                    if hum and hum.Health < 100 and hrp then
-                        -- Glitch detected / Injured! Snap to HRP 🛑
-                        if highlight.Adornee ~= hrp then 
-                            highlight.Adornee = nil -- Destroy engine cache
-                            highlight.Adornee = hrp 
-                            highlight.Enabled = false 
-                            highlight.Enabled = true -- 🗿 Force visual redraw
-                        end
-                        if textGui.Adornee ~= hrp then textGui.Adornee = hrp end
-                    else
-                        -- Full health: Standard full-body view
-                        if highlight.Adornee ~= p.Character then 
-                            highlight.Adornee = nil
-                            highlight.Adornee = p.Character 
-                            highlight.Enabled = false
-                            highlight.Enabled = true
-                        end
-                        local preferredHead = head or hrp
-                        if textGui.Adornee ~= preferredHead then textGui.Adornee = preferredHead end
-                    end
-                end
-            end
+            if isPlayerMurderer(p) then hasKnife = true; break end
         end
 
         -- 🤑 CHAD INFINITE LOOP FALLBACK ENGINE
@@ -943,7 +929,7 @@ saveConn(RunService.RenderStepped:Connect(function()
             elseif not currentMap then
                 clearAllPlayerESP()
                 espRoundState = "IDLE"
-                hasGunDroppedThisRound = false
+                hasGunDroppedThisRound = false 
             else
                 executeFullESPScan()
             end
@@ -955,7 +941,7 @@ saveConn(RunService.RenderStepped:Connect(function()
                     clearAllPlayerESP()
                     espRoundState = "IDLE" 
                     gunDropExisted = false
-                    hasGunDroppedThisRound = false
+                    hasGunDroppedThisRound = false 
                 end
             end
         end
@@ -966,7 +952,7 @@ saveConn(RunService.RenderStepped:Connect(function()
         
         if gunDrop then
             gunDropExisted = true
-            hasGunDroppedThisRound = true
+            hasGunDroppedThisRound = true 
             if not gunEsp then
                 local highlight = Instance.new("Highlight"); highlight.Name = "GunDrop_ESP"; highlight.Adornee = gunDrop; highlight.FillColor = Color3.fromRGB(255, 255, 0); highlight.FillTransparency = 0.3; highlight.OutlineColor = Color3.fromRGB(255, 255, 0); highlight.Parent = espStorage; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                 local bbGui = Instance.new("BillboardGui"); bbGui.Name = "Text"; bbGui.Adornee = gunDrop; bbGui.Size = UDim2.new(0, 100, 0, 50); bbGui.StudsOffset = Vector3.new(0, 3, 0); bbGui.AlwaysOnTop = true; bbGui.Parent = highlight
